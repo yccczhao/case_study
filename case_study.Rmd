@@ -1,0 +1,164 @@
+---
+title: "case_study"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(leaflet)
+```
+
+
+```{r}
+library(p8105.datasets)
+data("nyc_airbnb")
+```
+
+## Some questions
+
+* where are the most expensive aibnbs in nyc?
+* which neighborhood has the highest conventration?
+* which one is the cheapest?
+* which airbnb hosts are the most / best reviewed?
+* has the number increased or decreased over time?
+* do airbnb affect rent in their neighborhoods / buildings?
+* do descriptions correlate with price?
+* what about text reviews?
+
+```{r}
+nyc_airbnb = 
+  nyc_airbnb |> 
+  mutate(stars = review_scores_location / 2)
+```
+
+```{r}
+nyc_airbnb |> 
+  count(room_type, neighbourhood_group) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from = n
+  )
+```
+
+```{r}
+nyc_airbnb |> 
+  filter(neighbourhood_group == "Manhattan") |> 
+  count(room_type, neighbourhood) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from = n
+  )
+```
+
+
+## price
+
+```{r}
+nyc_airbnb |> 
+  mutate(price_rank = min_rank(price)) |> 
+  filter(price_rank < 3)
+```
+
+```{r}
+nyc_airbnb |> 
+  mutate(price_rank = min_rank(desc(price))) |> 
+  filter(price_rank < 3)
+```
+
+
+```{r}
+nyc_airbnb |> 
+  group_by(neighbourhood_group) |> 
+  mutate(price_rank = min_rank(desc(price))) |> 
+  filter(price_rank < 3)
+```
+
+
+```{r}
+nyc_airbnb |> 
+  filter(price < 1000) |> 
+  ggplot(aes(x = price)) +
+  geom_histogram() + 
+  facet_grid(room_type ~ neighbourhood_group)
+```
+
+prices on average
+
+```{r}
+nyc_airbnb |> 
+  group_by(room_type, neighbourhood_group) |> 
+  summarize(
+    mean_price = mean(price)
+  ) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from = mean_price
+  )
+```
+
+
+```{r}
+nyc_airbnb |> 
+  group_by(room_type, neighbourhood_group) |> 
+  summarize(
+    median_price = median(price)
+  ) |> 
+  pivot_wider(
+    names_from = room_type,
+    values_from = median_price
+  )
+```
+
+
+```{r}
+nyc_airbnb |> 
+  filter(neighbourhood_group == "Manhattan") |> 
+  filter(price < 500) |> 
+  filter(room_type != "Shared room") |> 
+  mutate(neighbourhood = fct_reorder(neighbourhood, price)) |> 
+  ggplot(aes(x = neighbourhood, y = price)) +
+  geom_boxplot() + 
+  facet_grid(. ~ room_type) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+## some host stuff
+
+```{r}
+nyc_airbnb |> 
+  filter(calculated_host_listings_count > 10)
+```
+
+
+## visualize price some more
+
+```{r}
+nyc_airbnb |> 
+  filter(neighbourhood_group == "Manhattan") |> 
+  filter(room_type == "Entire home/apt") |> 
+  filter(price < 500) |> 
+  ggplot(aes(x = lat, y = long, color = price)) +
+  geom_point(alpha = .5)
+```
+
+
+make a leaflet map
+
+```{r}
+pal = colorNumeric(
+  palette = "viridis",
+  domain = 1:500
+)
+
+nyc_airbnb |> 
+  filter(neighbourhood_group == "Manhattan") |> 
+  filter(room_type == "Entire home/apt") |> 
+  filter(price < 500) |> 
+  # sample_n(50) |> 
+  leaflet() |> 
+  addTiles() |> 
+  addCircleMarkers(~lat, ~long, color = ~pal(stars), radius = .5)
+```
+
+
